@@ -11,15 +11,8 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 db = firebase.database();
 
-// User Authentication
-firebase.auth().onAuthStateChanged((user) => {
-  if (user) {
-  } else {
-    console.log("No user signed in");
-  }
-});
-
-// App Element
+// Global Variables
+let loggedInPerson = null;
 const app = document.getElementById("app");
 
 // Render Pages
@@ -35,7 +28,7 @@ const renderHome = () => {
   document
     .getElementById("create-tournament-btn")
     .addEventListener("click", () => {
-      renderCreateTournament();
+      navigateTo("/create-tournament");
     });
 };
 
@@ -115,8 +108,46 @@ const renderCreateTournament = () => {
   </div>`;
 };
 
+// ... [Rest of your code, firebase init, render functions, etc.]
+
+const routeToPage = (parts) => {
+  // Check the primary route
+  const primaryRoute = parts[1]; // as parts[0] will be an empty string ""
+
+  switch (primaryRoute) {
+    case "":
+    case undefined:
+      renderHome();
+      break;
+    case "login":
+      renderLogin();
+      break;
+    // You can add more cases here for other primary routes
+    default:
+      renderHome(); // Default to home for now, but you could render a 404 page
+  }
+};
+
+const navigateTo = (path) => {
+  window.history.pushState({}, path, window.location.origin + path);
+  const pn = window.location.pathname;
+  const URLparts = pn.split("/");
+  routeToPage(URLparts);
+};
+
 // Event Listeners
 
 document.addEventListener("DOMContentLoaded", () => {
-  renderHome();
+  const pn = window.location.pathname;
+  const URLparts = pn.split("/");
+
+  firebase.auth().onAuthStateChanged((user) => {
+    if (user) {
+      loggedInPerson = user;
+      routeToPage(URLparts);
+    } else {
+      loggedInPerson = null;
+      routeToPage(URLparts); // We still need to route based on the path even if not logged in
+    }
+  });
 });
