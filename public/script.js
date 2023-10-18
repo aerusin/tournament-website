@@ -25,6 +25,7 @@ const renderHome = () => {
   <div>
   <h3>Upcoming Tournaments</h3>
   <div id="upcoming-tournaments-container">
+  </div>
   <h3>My Tournaments</h3>
   <div id="my-tournaments-container">
   </div>
@@ -73,17 +74,14 @@ const renderLogin = () => {
       .auth()
       .signInWithEmailAndPassword(email, password)
       .then((userCredential) => {
-        // Update status upon successful registration
         navigateTo("/");
         loggedInPerson = userCredential.user;
-        loggedIn();
       })
       .catch((error) => {
-        // Update status upon failure
         document.getElementById(
           "login-status"
         ).innerText = `Error: ${error.message}`;
-        console.log("error", error.message); // Include error message for more clarity
+        console.log("error", error.message);
       });
   });
 };
@@ -97,29 +95,29 @@ const renderSignup = () => {
   </p>
   <input type="text" id="email" placeholder="Email" />
   <input type="password" id="password" placeholder="Password" />
+  <input type="text" id="username" placeholder="Username" />
   <button id="signup-btn">SIGN UP</button>
   <h3 id="signup-status"></h3>
 </div>`;
   document.getElementById("signup-btn").addEventListener("click", () => {
-    const email = document.getElementById("email").value; // log email and password
+    const email = document.getElementById("email").value;
     const password = document.getElementById("password").value;
+    const username = document.getElementById("username").value;
     document.getElementById("email").value = "";
     document.getElementById("password").value = "";
+    document.getElementById("username").value = "";
     firebase
       .auth()
       .createUserWithEmailAndPassword(email, password)
       .then((userCredential) => {
-        // Update status upon successful registration
-        navigateTo("/");
         loggedInPerson = userCredential.user;
-        loggedIn();
+        db.ref("users/" + loggedInPerson.uid).set(username);
+        navigateTo("/");
       })
       .catch((error) => {
-        // Update status upon failure
         document.getElementById(
           "signup-status"
         ).textContent = `Error: ${error.message}`;
-        console.log("error", error.message); // Include error message for more clarity
       });
   });
 };
@@ -171,23 +169,34 @@ const renderCreateTournament = () => {
 
 const displayTournamentDetails = (tournamentData) => {
   app.innerHTML = `
+      <div id="tournament-details">
       <h1>${tournamentData.tournamentName}</h1>
       <p>Game: ${tournamentData.game}</p>
       <p>Description: ${tournamentData.description}</p>
       <h3>Players</h3>
       <ul id="players-list"></ul>
       <button id="back-button">Back to Home</button>
+      <button id="create-bracket">Create Bracket</button>
+      </div>
+      </div>
+      <div id="bracket-container">
+      </div>
   `;
 
   // Populate players list if any
   const playersList = document.getElementById("players-list");
   for (const playerId in tournamentData.players) {
     const playerItem = document.createElement("li");
-    playerItem.textContent = playerId; // Note: This just displays the UID. You might want to fetch actual user names.
+    playerItem.textContent = playerId;
     playersList.appendChild(playerItem);
   }
+  if (loggedInPerson.uid === tournamentData.owner) {
+    document.getElementById("create-bracket").style.display = "block";
+    document
+      .getElementById("create-bracket")
+      .addEventListener("click", () => {});
+  }
 
-  // Add event listener to the back button
   document.getElementById("back-button").addEventListener("click", () => {
     navigateTo("/");
   });
@@ -202,7 +211,6 @@ const renderTournament = (tournamentId) => {
       return;
     }
 
-    // Render the tournament details
     displayTournamentDetails(tournamentData);
   });
 };
@@ -223,6 +231,7 @@ const routeToPage = (parts) => {
       renderSignup();
       break;
     case "tournament":
+      console.log();
       renderTournament(parts[2]);
       break;
     default:
@@ -238,35 +247,36 @@ const navigateTo = (path) => {
   routeToPage(URLparts);
 };
 
-const displayPlayerTournaments = (tournaments) => {
-  const container = document.getElementById("my-tournaments-container");
-  container.innerHTML = "";
-  tournaments.forEach((tournament) => {
-    const div = document.createElement("h3");
-    div.className = "tournament-entry";
-    div.innerText = tournament.tournamentName;
-    div.addEventListener("click", () => {
-      console.log("clicked tournament", tournament.tournamentName);
-    });
-    container.appendChild(div);
-  });
-};
-
 const fetchTournamentsForPlayer = (uid) => {
-  console.log(uid);
+  const container = document.getElementById("my-tournaments-container");
+  const upcomingContainer = document.getElementById(
+    "upcoming-tournaments-container"
+  );
+
+  container.innerHTML = "";
+  upcomingContainer.innerHTML = "";
+
   const tournamentsRef = db.ref("tournaments");
+
   tournamentsRef.once("value", (snapshot) => {
     const allTournaments = snapshot.val();
-    const playerTournaments = [];
-    console.log(allTournaments);
+
     Object.keys(allTournaments).forEach((tournamentId) => {
       const tournament = allTournaments[tournamentId];
-      console.log(tournament.players);
+      const div = document.createElement("h3");
+
+      div.className = "tournament-entry";
+      div.innerText = tournament.tournamentName;
+      div.addEventListener("click", () => {
+        navigateTo("/tournament/" + tournamentId);
+      });
+
       if (tournament.players && uid in tournament.players) {
-        playerTournaments.push(tournament);
+        container.appendChild(div);
+      } else {
+        upcomingContainer.appendChild(div);
       }
     });
-    displayPlayerTournaments(playerTournaments);
   });
 };
 
@@ -293,7 +303,7 @@ const updateUIBasedOnAuth = (user) => {
   const loginBtn = document.getElementById("login");
   const signupBtn = document.getElementById("signup");
   const logoutBtn = document.getElementById("logout");
-  const usernameElem = document.getElementById("username");
+  const usernameElem = document.getElementById("username-display");
 
   if (user) {
     loggedInPerson = user;
@@ -304,15 +314,18 @@ const updateUIBasedOnAuth = (user) => {
 
     // Show logout button and user email
     if (logoutBtn) logoutBtn.style.display = "block";
-    if (usernameElem) usernameElem.textContent = user.email;
+    if (usernameElem) {
+      db.ref("users/" + loggedInPerson.uid).once("value", (snapshot) => {
+        console.log("yoyoyo", snapshot.val());
+        usernameElem.textContent = snapshot.val();
+      });
+    }
   } else {
     loggedInPerson = null;
 
-    // Show login and signup buttons
     if (loginBtn) loginBtn.style.display = "block";
     if (signupBtn) signupBtn.style.display = "block";
 
-    // Hide logout button and user email
     if (logoutBtn) logoutBtn.style.display = "none";
     if (usernameElem) usernameElem.textContent = "";
   }
