@@ -177,6 +177,7 @@ const displayTournamentDetails = (tournamentData) => {
       <ul id="players-list"></ul>
       <button id="back-button">Back to Home</button>
       <button id="create-bracket">Create Bracket</button>
+      <button id="join-tournament">Join Tournament</button>
       </div>
       </div>
       <div id="bracket-container">
@@ -195,6 +196,30 @@ const displayTournamentDetails = (tournamentData) => {
     document
       .getElementById("create-bracket")
       .addEventListener("click", () => {});
+  } else {
+    if (loggedInPerson.uid in tournamentData.players) {
+      document.getElementById("join-tournament").style.display = "none";
+    }
+    document.getElementById("join-tournament").style.display = "block";
+    document.getElementById("join-tournament").addEventListener("click", () => {
+      const playersObj = tournamentData.players;
+      playersObj[loggedInPerson.uid] = {
+        isInTournament: true,
+      };
+      const tournament = {
+        tournamentName: tournamentData.tournamentName,
+        game: tournamentData.game,
+        description: tournamentData.description,
+        owner: tournamentData.owner,
+        players: playersObj,
+      };
+      const newTournamentRef = db.ref("tournaments/" + tournamentData.id);
+      newTournamentRef.set(tournament).then(() => {
+        console.log("tournament created");
+        navigateTo("/tournament/" + newTournamentRef.key);
+      });
+    });
+    document.getElementById("join-tournament").style.display = "none";
   }
 
   document.getElementById("back-button").addEventListener("click", () => {
