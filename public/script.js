@@ -13,6 +13,7 @@ db = firebase.database();
 
 // Global Variables
 let loggedInPerson = null;
+let currentUsername = null;
 const app = document.getElementById("app");
 
 // Render Pages
@@ -76,6 +77,11 @@ const renderLogin = () => {
       .then((userCredential) => {
         navigateTo("/");
         loggedInPerson = userCredential.user;
+        db.ref("users/" + loggedInPerson.uid).once("value", () => {
+          username = snapshot.val();
+          updateUIBasedOnAuth(loggedInPerson);
+          navigateTo("/");
+        });
       })
       .catch((error) => {
         document.getElementById(
@@ -149,7 +155,7 @@ const renderCreateTournament = () => {
     const game = $("#game").val();
     const description = $("#description").val();
     const playersObj = {};
-    playersObj[loggedInPerson.uid] = {
+    playersObj[currentUsername] = {
       isInTournament: true,
     };
     const tournament = {
@@ -169,33 +175,48 @@ const renderCreateTournament = () => {
 
 const displayTournamentDetails = (tournamentData) => {
   app.innerHTML = `
-      <div id="tournament-details">
+  <div id="tournament-details">
       <h1>${tournamentData.tournamentName}</h1>
       <p>Game: ${tournamentData.game}</p>
+      <p id="owner-info">Owner: Loading...</p>
       <p>Description: ${tournamentData.description}</p>
       <h3>Players</h3>
       <ul id="players-list"></ul>
       <button id="back-button">Back to Home</button>
       <button id="create-bracket">Create Bracket</button>
+      <button id="add-player">Add Player</button>
       <button id="join-tournament">Join Tournament</button>
-      </div>
-      </div>
-      <div id="bracket-container">
-      </div>
-  `;
+  </div>
+  <div id="bracket-container"></div>
+`;
+
+  const ownerElem = document.getElementById("owner-info");
+  db.ref("users/" + tournamentData.owner)
+    .once("value")
+    .then((snapshot) => {
+      const user = snapshot.val();
+      ownerElem.innerHTML = `Owner: ${user.username}`;
+    });
 
   // Populate players list if any
-  const playersList = document.getElementById("players-list");
   for (const playerId in tournamentData.players) {
-    const playerItem = document.createElement("li");
-    playerItem.textContent = playerId;
-    playersList.appendChild(playerItem);
+    db.ref("users/" + playerId)
+      .once("value")
+      .then((snapshot) => {
+        const user = snapshot.val();
+        const playerItem = document.createElement("li");
+        playerItem.textContent = user.username;
+        playersList.appendChild(playerItem);
+      });
   }
+
   if (loggedInPerson.uid === tournamentData.owner) {
     document.getElementById("create-bracket").style.display = "block";
     document
       .getElementById("create-bracket")
       .addEventListener("click", () => {});
+    document.getElementById("add-player").style.display = "block";
+    document.getElementById("add-player").addEventListener("click", () => {});
   } else {
     if (loggedInPerson.uid in tournamentData.players) {
       document.getElementById("join-tournament").style.display = "none";
@@ -314,7 +335,7 @@ document.addEventListener("DOMContentLoaded", () => {
   firebase.auth().onAuthStateChanged((user) => {
     if (user) {
       updateUIBasedOnAuth(user);
-      loggedInPerson = user;
+      loggedInPerson = user.user;
       document.getElementById("logout").class;
       routeToPage(URLparts);
     } else {
@@ -340,10 +361,7 @@ const updateUIBasedOnAuth = (user) => {
     // Show logout button and user email
     if (logoutBtn) logoutBtn.style.display = "block";
     if (usernameElem) {
-      db.ref("users/" + loggedInPerson.uid).once("value", (snapshot) => {
-        console.log("yoyoyo", snapshot.val());
-        usernameElem.textContent = snapshot.val();
-      });
+      usernameElem.textContent = currentUsername;
     }
   } else {
     loggedInPerson = null;
