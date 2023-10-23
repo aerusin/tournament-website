@@ -119,8 +119,8 @@ const renderSignup = () => {
       .then((userCredential) => {
         loggedInPerson = userCredential.user;
         db.ref("users/" + loggedInPerson.uid).set(username);
-        updateUIBasedOnAuth(loggedInPerson);
         currentUsername = username;
+        updateUIBasedOnAuth(loggedInPerson);
         navigateTo("/");
       })
       .catch((error) => {
@@ -158,7 +158,7 @@ const renderCreateTournament = () => {
     const game = $("#game").val();
     const description = $("#description").val();
     const playersObj = {};
-    playersObj[loggedInPerson.uid] = {
+    playersObj[currentUsername] = {
       isInTournament: true,
     };
     const tournament = {
@@ -209,11 +209,12 @@ const displayTournamentDetails = async (tournamentData) => {
   }
 
   const playersListElem = document.getElementById("players-list");
-  for (const player in tournamentData.players) {
+  console.log(tournamentData);
+  Object.keys(tournamentData.players).forEach((player) => {
     const li = document.createElement("li");
-    li.textContent = tournamentData.players[player];
+    li.textContent = player;
     playersListElem.appendChild(li);
-  }
+  });
   console.log("loggedin", loggedInPerson);
   const joinTournamentButton = document.getElementById("join-tournament");
 
@@ -401,10 +402,10 @@ document.addEventListener("DOMContentLoaded", () => {
   firebase.auth().onAuthStateChanged((user) => {
     if (user) {
       updateUIBasedOnAuth(user);
-      loggedInPerson = user.user;
-      document.getElementById("logout").class;
+      document.getElementById("logout").classList.remove("hidden");
       routeToPage(URLparts);
     } else {
+      document.getElementById("logout").classList.add("hidden");
       loggedInPerson = false;
       routeToPage(URLparts);
     }
@@ -418,7 +419,9 @@ const updateUIBasedOnAuth = (user) => {
   const usernameElem = document.getElementById("username-display");
 
   if (user) {
+    console.log("here");
     loggedInPerson = user;
+    console.log(currentUsername);
 
     // Hide login and signup buttons
     if (loginBtn) loginBtn.style.display = "none";
