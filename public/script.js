@@ -189,6 +189,7 @@ const displayTournamentDetails = async (tournamentData) => {
       <button id="create-bracket">Create Bracket</button>
       <button id="add-player">Add Player</button>
       <button id="join-tournament">Join Tournament</button>
+      <input type="text" id="player-name" placeholder="Player Name" />
   </div>
   <div id="bracket-container"></div>
 `;
@@ -208,60 +209,55 @@ const displayTournamentDetails = async (tournamentData) => {
   }
 
   const playersListElem = document.getElementById("players-list");
-  if (playersListElem && tournamentData.players) {
-    for (const playerId in tournamentData.players) {
-      const snapshot = await db.ref("users/" + playerId).once("value");
-      const user = snapshot.val();
-      if (user) {
-        // Check user before using it
-        const playerItem = document.createElement("li");
-        playerItem.textContent = user.username;
-        playersListElem.appendChild(playerItem);
-      } else {
-        console.warn(`User data for player ${playerId} not found.`);
-      }
-    }
+  for (const player in tournamentData.players) {
+    const li = document.createElement("li");
+    li.textContent = tournamentData.players[player];
+    playersListElem.appendChild(li);
   }
+  console.log("loggedin", loggedInPerson);
+  const joinTournamentButton = document.getElementById("join-tournament");
 
-  if (loggedInPerson.uid === tournamentData.owner) {
-    // ... the same as before ...
+  if (loggedInPerson.uid in tournamentData.players) {
+    joinTournamentButton.textContent = "Already Joined";
+    joinTournamentButton.style.display = "block";
   } else {
-    const joinTournamentButton = document.getElementById("join-tournament");
+    joinTournamentButton.textContent = "Join Tournament";
+    joinTournamentButton.style.display = "block";
 
-    if (loggedInPerson.uid in tournamentData.players) {
+    joinTournamentButton.addEventListener("click", async () => {
+      if (!tournamentData.players) tournamentData.players = {}; // Initialize if not present
+      tournamentData.players[loggedInPerson.uid] = {
+        isInTournament: true,
+      };
+
+      const tournamentRef = db.ref("tournaments/" + tournamentData.id);
+      await tournamentRef.set(tournamentData);
+      console.log("User added to the tournament.");
+
       joinTournamentButton.textContent = "Already Joined";
-      joinTournamentButton.style.display = "block";
-    } else {
-      joinTournamentButton.textContent = "Join Tournament";
-      joinTournamentButton.style.display = "block";
-
-      joinTournamentButton.addEventListener("click", async () => {
-        // Add current user to the tournament's players
-        if (!tournamentData.players) tournamentData.players = {}; // Initialize if not present
-        tournamentData.players[loggedInPerson.uid] = {
-          isInTournament: true,
-        };
-
-        // Update the tournament in the Firebase database
-        const tournamentRef = db.ref("tournaments/" + tournamentData.id);
-        await tournamentRef.set(tournamentData);
-        console.log("User added to the tournament.");
-
-        // Update the button's text and behavior after joining
-        joinTournamentButton.textContent = "Already Joined";
-        joinTournamentButton.removeEventListener("click");
-      });
-    }
+      joinTournamentButton.removeEventListener("click");
+    });
   }
 
   document.getElementById("back-button").addEventListener("click", () => {
     navigateTo("/");
+  });
+  document.getElementById("add-player").addEventListener("click", () => {
+    const playerName = document.getElementById("player-name").value;
+    console.log(tournamentData);
+    document.getElementById("player-name").value = "";
+    db.ref("tournaments/" + tournamentData.id + "/players").push(playerName);
+  });
+
+  document.getElementById("create-bracket").addEventListener("click", () => {
+    createBracket(tournamentData.players);
   });
 };
 
 const renderTournament = async (tournamentId) => {
   const snapshot = await db.ref("tournaments/" + tournamentId).once("value");
   const tournamentData = snapshot.val();
+  tournamentData.id = tournamentId;
   if (!tournamentData) {
     app.innerHTML = "<h1>Tournament Not Found</h1>";
     return;
@@ -292,6 +288,68 @@ const routeToPage = (parts) => {
       renderHome();
   }
 };
+
+const createBracket = (players) => {
+  const bracketContainer = document.getElementById("bracket-container");
+  bracketContainer.innerHTML = "";
+
+  let matches = Object.keys(players).length / 2;
+
+  for (let i = 0; i < matches; i++) {
+    let matchContainer = document.createElement("div");
+    matchContainer.className = "match-container";
+
+    let player1 = document.createElement("div");
+    player1.className = "player";
+    player1.textContent = players[Object.keys(players)[i * 2]];
+    player1.setAttribute("data-id", Object.keys(players)[i * 2]);
+
+    let player2 = document.createElement("div");
+    player2.className = "player";
+    player2.textContent = players[Object.keys(players)[i * 2 + 1]];
+
+    player2.setAttribute("data-id", Object.keys(players)[i * 2 + 1]);
+
+    let scoreInput1 = document.createElement("input");
+    scoreInput1.setAttribute("type", "number");
+    scoreInput1.setAttribute("placeholder", "Score");
+
+    let scoreInput2 = document.createElement("input");
+    scoreInput2.setAttribute("type", "number");
+    scoreInput2.setAttribute("placeholder", "Score");
+
+    let submitScore = document.createElement("button");
+    submitScore.textContent = "Submit Score";
+    submitScore.addEventListener("click", () => {
+      handleScoreSubmission(scoreInput1, scoreInput2, player1, player2);
+    });
+
+    matchContainer.appendChild(player1);
+    matchContainer.appendChild(scoreInput1);
+    matchContainer.appendChild(player2);
+    matchContainer.appendChild(scoreInput2);
+    matchContainer.appendChild(submitScore);
+
+    bracketContainer.appendChild(matchContainer);
+  }
+};
+
+const handleScoreSubmission = (scoreInput1, scoreInput2, player1, player2) => {
+  let score1 = parseInt(scoreInput1.value);
+  let score2 = parseInt(scoreInput2.value);
+
+  if (score1 > score2) {
+    advancePlayer(player1);
+  } else if (score1 < score2) {
+    advancePlayer(player2);
+  } else {
+    alert("It's a draw! Please resolve and input scores again.");
+  }
+};
+
+function advancePlayer(player) {
+  player.style.backgroundColor = "green";
+}
 
 const navigateTo = (path) => {
   window.history.pushState({}, path, window.location.origin + path);

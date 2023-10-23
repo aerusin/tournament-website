@@ -88,3 +88,16 @@ label {
 .tournament-entry:hover {
   background-color: #f6f8fa;
 }
+
+.match-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+}
+
+.player {
+  padding: 10px;
+  border: 1px solid black;
+}
+
